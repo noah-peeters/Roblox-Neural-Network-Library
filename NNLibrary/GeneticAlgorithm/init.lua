@@ -67,7 +67,7 @@ end
 function GeneticAlgorithm:AddNetwork(network)
 	--Base.Assert(network,"NeuralNetwork")
 	
-	table.insert(self.Population,{Network=network,Score=0})
+	table.insert(self.Population, {Network = network,Score = 0})
 end
 
 function GeneticAlgorithm:ProcessGeneration(scoreArray)
@@ -98,13 +98,27 @@ function GeneticAlgorithm:ProcessGenerations(num)
 	end
 end
 
-function GeneticAlgorithm:ProcessGenerationsInBatch(num)
-	Base.Assert(num,"number")
-	
-	for _ = 1, num do
+function GeneticAlgorithm:ProcessGenerationsInBatch(generationsNum, delayBetweenPopulations, delayBetweenGenerations)
+	Base.Assert(generationsNum, "number")
+
+	for _ = 1, generationsNum do
 		-- Run network for one complete generation and calculate scores
-		self:CalculateScores(true)
+		self:CalculateScores(true, delayBetweenGenerations)
 		self.ScoresCalculated = true
+
+		-- Wait for generation to finish simulating
+		local population = self.Population
+		local bool = false
+		repeat
+			bool = true
+			for i, v in pairs(population) do
+				if not v.Score then
+					bool = false
+				end
+			end
+			wait(1)
+		until bool == true
+		print("sim finished")
 
 		-- Handle end of generation
 		self:SortPopulation()
@@ -117,6 +131,7 @@ function GeneticAlgorithm:ProcessGenerationsInBatch(num)
 		if postFunc then
 			postFunc(self)
 		end
+		wait(delayBetweenPopulations)
 	end
 end
 

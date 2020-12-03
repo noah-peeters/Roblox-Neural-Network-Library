@@ -1,17 +1,35 @@
 local HttpService = game:GetService("HttpService")
+local PhysicsService = game:GetService("PhysicsService")
 local Package = game:GetService("ReplicatedStorage").NNLibrary
 local FeedforwardNetwork = require(Package.NeuralNetwork.FeedforwardNetwork)
 local ParamEvo = require(Package.GeneticAlgorithm.ParamEvo)
 
---If the training/testing is intensive, we will want to setup automatic wait() statements
---in order to avoid a timeout. This can be done with os.clock().
+
+
 local clock = os.clock()
+local collisionGroupName = "CarCollisionsDisabled"
+
+-- Setup CollisionGroup for cars
+PhysicsService:CreateCollisionGroup(collisionGroupName)
+PhysicsService:CollisionGroupSetCollidable(collisionGroupName, collisionGroupName, false)
 
 -- Function to activate scripts inside of car
-local function ActivateScripts(Model)
-	for _,Item in pairs(Model:GetDescendants()) do
-		if Item:IsA("Script") then
-			Item.Disabled = false
+local function setupCar(car)
+	car.RemoteControl.MaxSpeed = 200
+	car.RemoteControl.Torque = 40
+	car.RemoteControl.Throttle = 1
+	car.RemoteControl.TurnSpeed = 25
+	for _, item in pairs(car:GetDescendants()) do
+		if item:IsA("BasePart") then
+			PhysicsService:SetPartCollisionGroup(item, collisionGroupName)
+		end
+	end
+
+	-- Parent to workspace and then setup Scripts of car
+	car.Parent = workspace
+	for _, item in pairs(car:GetDescendants()) do
+		if item:IsA("Script") then
+			item.Disabled = false
 		end
 	end
 end
@@ -78,14 +96,8 @@ local geneticSetting = {
 	ScoreFunction = function(net)
 		local startTime = os.clock()
 		local car = game:GetService("ServerStorage").Car:Clone()
-		car.Parent = workspace
-		
 		-- Setup car
-		ActivateScripts(car)
-		car.RemoteControl.MaxSpeed = 200
-		car.RemoteControl.Torque = 40
-		car.RemoteControl.Throttle = 1
-		car.RemoteControl.TurnSpeed = 25
+		setupCar(car)
 
 		local bool = true
 		for _, v in pairs(car:GetDescendants()) do
@@ -141,10 +153,10 @@ local feedForwardSettings = {
 local tempNet = FeedforwardNetwork.new({"front", "frontLeft", "frontRight", "left", "right"}, 2, 4, {"steerDirection"}, feedForwardSettings) --FeedforwardNetwork.newFromSave(game.ServerStorage.NetworkSave.Value)
 
 -- Create ParamEvo with the tempNet template, population size and settings
-local geneticAlgo = ParamEvo.new(tempNet, 10, geneticSetting)
+local geneticAlgo = ParamEvo.new(tempNet, 20, geneticSetting)
 
--- Run the algorithm x generations
-geneticAlgo:ProcessGenerationsInBatch(100)
+-- Run the algorithm x generations1
+geneticAlgo:ProcessGenerationsInBatch(100, 0.5, 1)
 
 -- Get the best network in the population
 local net = geneticAlgo:GetBestNetwork()
