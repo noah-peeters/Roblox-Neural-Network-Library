@@ -151,16 +151,25 @@ function ParamEvo:MutateNetworks()
 	end
 end
 
-function ParamEvo:CalculateScores()
+function ParamEvo:CalculateScores(batchBool)
 	local population = self.Population
 	local popSize = self.PopSize
 	local setting = self.GeneticSettings
-	
 	local scoreFunc = setting.ScoreFunction
+
 	if scoreFunc then
-		
-		for k,v in pairs(population) do
-			v.Score = scoreFunc(v.Network)
+		if not batchBool then	-- Calculate simulations one by one
+			-- Loop for handling each simulation for the population count of this generation
+			for _, v in pairs(population) do
+				v.Score = scoreFunc(v.Network)
+			end
+		elseif batchBool then	-- Calculate every simulation of this generation at once
+			for _, v in pairs(population) do
+				spawn(function()
+					v.Score = scoreFunc(v.Network)
+				end)
+				wait(3)
+			end
 		end
 	else
 		error("No scores or ScoreFunction were provided!")

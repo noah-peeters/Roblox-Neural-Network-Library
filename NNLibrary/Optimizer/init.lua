@@ -18,6 +18,8 @@ function Optimizer.new()
 	
 	obj.Network = nil
 	
+	obj.CreationVariables = {}
+	
 	return obj
 end
 
