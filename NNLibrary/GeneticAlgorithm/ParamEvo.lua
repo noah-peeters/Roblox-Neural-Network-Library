@@ -12,7 +12,7 @@ local Base = require(Package.BaseRedirect)
 local GeneticAlgorithm = require(Package.GeneticAlgorithm)
 
 --local ParamEvo = Base.new("ParamEvo")
-local ParamEvo = Base.newExtends("ParamEvo",GeneticAlgorithm)
+local ParamEvo = Base.newExtends("ParamEvo", GeneticAlgorithm)
 
 function ParamEvo.new(neuralNetworkTemp,popSize,geneticSettings)
 	Base.Assert(neuralNetworkTemp, "NeuralNetwork", popSize, "number", geneticSettings, "dictionary OPT")
