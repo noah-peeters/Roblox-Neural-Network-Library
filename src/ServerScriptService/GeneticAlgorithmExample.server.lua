@@ -1,10 +1,7 @@
-local HttpService = game:GetService("HttpService")
 local PhysicsService = game:GetService("PhysicsService")
 local Package = game:GetService("ReplicatedStorage").NNLibrary
 local FeedforwardNetwork = require(Package.NeuralNetwork.FeedforwardNetwork)
 local ParamEvo = require(Package.GeneticAlgorithm.ParamEvo)
-
-
 
 local clock = os.clock()
 local collisionGroupName = "CarCollisionsDisabled"
@@ -40,8 +37,8 @@ local function setupCar(car)
 end
 
 -- Setup car
-local car = game:GetService("ServerStorage").Car
-setupCar(car)
+local carSource = game:GetService("ServerStorage").Car
+setupCar(carSource)
 
 -- Function that casts rays from the car in five directions and returns the distances in a table
 local function getRayDistances(car)
@@ -91,7 +88,7 @@ end
 
 -- Settings for genetic algorithm
 local geneticSetting = {
-	--The function that, when given the network, will return it's score.
+	--[[ The function that, when given the network, will return it's score.
 	ScoreFunction = function(net)
 		local startTime = os.clock()
 		local clone = game:GetService("ServerStorage").Car:Clone()
@@ -138,8 +135,8 @@ local geneticSetting = {
 
 		clone:Destroy()
 		return score
-	end;
-	--The function that runs when a generation is complete. It is given the genetic algorithm as input.
+	end;]]
+	-- The function that runs when a generation is complete. It is given the genetic algorithm as input.
 	PostFunction = function(geneticAlgo)
 		local info = geneticAlgo:GetInfo()
 		print("Generation "..info.Generation..", Best Score: "..info.BestScore)
@@ -150,7 +147,7 @@ local geneticSetting = {
 	PercentageToKill = 0.4;
 	PercentageOfKilledToRandomlySpare = 0.1;
 	PercentageOfBestParentToCrossover = 0.8;
-	PercentageToMutate = 0.5;
+	PercentageToMutate = 0.7;
 	
 	MutateBestNetwork = true;
 	PercentageOfCrossedToMutate = 0.6;
@@ -161,24 +158,95 @@ local geneticSetting = {
 local feedForwardSettings = {
 	HiddenActivationName = "ReLU";
 	OutputActivationName = "Tanh";
-	--Bias = 0;
+	Bias = 0;
     LearningRate = 0.5;
-    --RandomizeWeights = true;
+    RandomizeWeights = true;
 }
 
 -- Create a new network with 5 inputs, 2 layers with 4 nodes each and 1 output "steerDirection"
---local tempNet = FeedforwardNetwork.new({"front", "frontLeft", "frontRight", "left", "right"}, 2, 4, {"steerDirection"}, feedForwardSettings)
-local tempNet = FeedforwardNetwork.newFromSave(game.ServerStorage.NetworkSave.Value)
+local tempNet = FeedforwardNetwork.new({"front", "frontLeft", "frontRight", "left", "right"}, 2, 4, {"steerDirection"}, feedForwardSettings)
+--local tempNet = FeedforwardNetwork.newFromSave(game.ServerStorage.NetworkSave.Value)
+local populationSize = 15
 
-local geneticAlgo = ParamEvo.new(tempNet, 30, geneticSetting)		-- Create ParamEvo with the tempNet template, population size and settings
+local geneticAlgo = ParamEvo.new(tempNet, populationSize, geneticSetting)		-- Create ParamEvo with the tempNet template, population size and settings
+
+local scoreTable = {}
+local generations = 50	-- Number of generations to train network with
+local firstRun = true
+for _ = 0, generations do
+	for index = 1, populationSize+1 do
+		spawn(function()
+			local startTime = os.clock()
+			local clone = game:GetService("ServerStorage").Car:Clone()
+			clone.RemoteControl.MaxSpeed = 200
+
+			-- Parent to workspace and then setup Scripts of car
+			clone.Parent = workspace
+
+			local score = 0
+			local bool = true
+			local checkpointsHit = {}
+			for _, v in pairs(clone:GetDescendants()) do
+				if v:IsA("BasePart") and v.CanCollide == true then
+					v.Touched:Connect(function(hit)
+						if hit.Parent.Parent == workspace.Walls then	-- Destroy car on hit of walls
+							bool = false
+						elseif hit.Parent == workspace.Checkpoints and not checkpointsHit[tonumber(hit.Name)] then	-- Give extra points when car reaches checkpoint
+							local numHit = tonumber(hit.Name)
+							score += (numHit * 2)
+							checkpointsHit[numHit] = hit
+						end
+					end)
+				end
+			end
+			while bool do
+				local distances = getRayDistances(clone)		-- Get Distances of rays
+				local output
+				if firstRun then
+					output = tempNet(distances)				-- Get output of NN with input distances
+				else
+					local population = geneticAlgo:GetPopulation()
+					local net = population[1].Network
+					output = net(distances)				-- Get output of NN with input distances
+				end
+
+				-- Set steering direction to direction of NN
+				clone.RemoteControl.SteerFloat = output.steerDirection
+				-- Set speed of car
+				--clone.RemoteControl.MaxSpeed = math.abs(output.speed) * 300
+
+				-- Check if this simulation has been running for longer than x seconds
+				if os.clock() > startTime + 90 then
+					score -= 40	-- Punish algorithm
+					break
+				end
+				wait()
+			end
+			
+			score += (os.clock() - startTime)/2		-- Increment score based on time alive (longer is better)
+			print("Exit score: "..math.floor(score*100)/100)
+
+			clone:Destroy()
+			scoreTable[index] = score
+		end)
+		wait(1)
+	end
+	-- Wait until generation finished
+	repeat
+		wait(1)
+	until #scoreTable >= populationSize
+	
+	geneticAlgo:ProcessGeneration(scoreTable)
+	scoreTable = {}
+	firstRun = false
+end
 
 -- Run the algorithm x generations
-geneticAlgo:ProcessGenerationsInBatch(15, 1, 1)
+--geneticAlgo:ProcessGenerationsInBatch(15, 1, 1)
 
 local save = geneticAlgo:GetBestNetwork():Save()
-local stringSave = HttpService:JSONEncode(save)
-game.ServerStorage.NetworkSave.Value = stringSave
-print(stringSave)
+game.ServerStorage.NetworkSave.Value = save
+print(save)
 
 --[[ * Code for running network
 for i = 1, 20 do

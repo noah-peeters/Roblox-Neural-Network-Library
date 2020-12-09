@@ -234,7 +234,7 @@ function GeneticAlgorithm:SetScores(scoreArray)
 	--Base.Assert(scoreArray,"array")
 	local population = self.Population
 	
-	for k,v in pairs(population) do
+	for k, v in pairs(population) do
 		v.Score = scoreArray[k]
 	end
 end
