@@ -12,10 +12,10 @@ local Base = require(Package.BaseRedirect)
 local GeneticAlgorithm = require(Package.GeneticAlgorithm)
 
 --local ParamEvo = Base.new("ParamEvo")
-local ParamEvo = Base.newExtends("ParamEvo", GeneticAlgorithm)
+local ParamEvo = Base.newExtends("ParamEvo",GeneticAlgorithm)
 
 function ParamEvo.new(neuralNetworkTemp,popSize,geneticSettings)
-	Base.Assert(neuralNetworkTemp, "NeuralNetwork", popSize, "number", geneticSettings, "dictionary OPT")
+	Base.Assert(neuralNetworkTemp,"NeuralNetwork",popSize,"number",geneticSettings,"dictionary OPT")
 	
 	--local obj = ParamEvo:make()
 	local obj = ParamEvo:super(neuralNetworkTemp,popSize,geneticSettings)
@@ -151,26 +151,16 @@ function ParamEvo:MutateNetworks()
 	end
 end
 
-function ParamEvo:CalculateScores(batchBool, delayBetweenPopulations)
+function ParamEvo:CalculateScores()
 	local population = self.Population
 	local popSize = self.PopSize
 	local setting = self.GeneticSettings
+	
 	local scoreFunc = setting.ScoreFunction
-
 	if scoreFunc then
-		if not batchBool then	-- Calculate simulations one by one
-			-- Loop for handling each simulation for the population count of this generation
-			for _, v in pairs(population) do
-				v.Score = scoreFunc(v.Network)	-- Set score/Start sim
-			end
-		elseif batchBool then	-- Calculate every simulation of this generation at once
-			for _, v in pairs(population) do
-				spawn(function()
-					v.Score = nil					-- Reset score
-					v.Score = scoreFunc(v.Network)	-- Set score/Start sim
-				end)
-				wait(delayBetweenPopulations)
-			end
+		
+		for k,v in pairs(population) do
+			v.Score = scoreFunc(v.Network)
 		end
 	else
 		error("No scores or ScoreFunction were provided!")

@@ -13,7 +13,7 @@ local GeneticAlgorithm = Base.new("GeneticAlgorithm")
 --local GeneticAlgorithm = Base.newExtends("GeneticAlgorithm",?)
 
 function GeneticAlgorithm.new(neuralNetwork,popSize,geneticSettings)
-	Base.Assert(neuralNetwork, "NeuralNetwork", popSize, "number", geneticSettings, "dictionary OPT")
+	Base.Assert(neuralNetwork,"NeuralNetwork",popSize,"number",geneticSettings,"dictionary OPT")
 	
 	local obj = GeneticAlgorithm:make()
 	--local obj = GeneticAlgorithm:super()
@@ -38,7 +38,7 @@ function GeneticAlgorithm.new(neuralNetwork,popSize,geneticSettings)
 	
 	
 	if geneticSettings then
-		for setting, value in pairs(default) do
+		for setting,value in pairs(default) do
 			if geneticSettings[setting] ~= nil then
 				default[setting] = geneticSettings[setting]
 			end
@@ -67,7 +67,7 @@ end
 function GeneticAlgorithm:AddNetwork(network)
 	--Base.Assert(network,"NeuralNetwork")
 	
-	table.insert(self.Population, {Network = network, Score = 0})
+	table.insert(self.Population,{Network=network,Score=0})
 end
 
 function GeneticAlgorithm:ProcessGeneration(scoreArray)
@@ -90,59 +90,25 @@ end
 function GeneticAlgorithm:ProcessGenerations(num)
 	Base.Assert(num,"number")
 	
-	--[[if not self.ScoreFunc then
+	if not self.ScoreFunc then
 		--TODO error
-	end]]
-	for _ = 1, num do
+	end
+	
+	for i=1, num do
 		self:ProcessGeneration()
 	end
 end
 
-function GeneticAlgorithm:ProcessGenerationsInBatch(generationsNum, delayBetweenPopulations, delayBetweenGenerations)
-	Base.Assert(generationsNum, "number")
-
-	for _ = 1, generationsNum do
-		-- Run network for one complete generation and calculate scores
-		self:CalculateScores(true, delayBetweenPopulations)
-		self.ScoresCalculated = true
-
-		-- Wait for generation to finish simulating
-		local population = self.Population
-		local bool = false
-		repeat
-			bool = true
-			for i, v in pairs(population) do
-				if not v.Score then
-					bool = false
-				end
-			end
-			wait(1)
-		until bool == true
-
-		-- Handle end of generation
-		self:SortPopulation()
-		self:KillWorstNetworks()
-		self:CrossoverNetworksToFill()
-		self.Generation += 1
-
-		-- Run PostFunction
-		local postFunc = self.GeneticSettings.PostFunction
-		if postFunc then
-			postFunc(self)
-		end
-		wait(delayBetweenGenerations)
-	end
-end
-
 function GeneticAlgorithm:CrossoverNetworksToFill()
+	
 	local population = self.Population
 	local popSize = self.PopSize
 	local setting = self.GeneticSettings
 	
-	--local percOfBestParentToCrossover = setting.PercentageOfBestParentToCrossover
+	local percOfBestParentToCrossover = setting.PercentageOfBestParentToCrossover
 	local missingNetworks = popSize - #population
 	
-	for _ = 1, missingNetworks do
+	for i=1, missingNetworks do
 		
 		local parentIndexes = Base.DistinctRandIntArray(1,#population,2)
 		table.sort(parentIndexes,function(a,b)
@@ -156,7 +122,7 @@ function GeneticAlgorithm:CrossoverNetworksToFill()
 	end
 end
 
-function GeneticAlgorithm:CrossoverNetworks(parent1, parent2)
+function GeneticAlgorithm:CrossoverNetworks(parent1,parent2)
 end
 
 function GeneticAlgorithm:KillWorstNetworks()
@@ -167,7 +133,7 @@ function GeneticAlgorithm:KillWorstNetworks()
 	local percToKill = setting.PercentageToKill
 	local percToRandSpare = setting.PercentageOfKilledToRandomlySpare
 	local indexStart = math.clamp(math.floor(popSize * (1-percToKill) + 1), 2, popSize)
-	for i = indexStart, self.PopSize do
+	for i=indexStart, self.PopSize do
 		if math.random() < percToRandSpare then continue end
 		
 		if population[i] == nil then
@@ -198,7 +164,7 @@ function GeneticAlgorithm:KillWorstNetworks()
 	
 	for i=#population,indexStart,-1 do
 		if not population[i] then
-			table.remove(population, i)
+			table.remove(population,i)
 		end
 	end
 	
@@ -207,6 +173,7 @@ end
 
 function GeneticAlgorithm:ScoreNetworks(scoreArray)
 	--Base.Assert(scoreArray,"array OPT")
+	
 	if not self.ScoresCalculated then
 		if scoreArray then
 			self:SetScores(scoreArray)
@@ -220,8 +187,10 @@ function GeneticAlgorithm:ScoreNetworks(scoreArray)
 end
 
 function GeneticAlgorithm:SortPopulation()
-	local higherScoreBetter = self.GeneticSettings.HigherScoreBetter
-	table.sort(self.Population, function(a,b)
+	local setting = self.GeneticSettings 
+	
+	local higherScoreBetter = setting.HigherScoreBetter
+	table.sort(self.Population,function(a,b)
 		if higherScoreBetter then
 			return a.Score > b.Score
 		else
@@ -232,9 +201,10 @@ end
 
 function GeneticAlgorithm:SetScores(scoreArray)
 	--Base.Assert(scoreArray,"array")
+	
 	local population = self.Population
 	
-	for k, v in pairs(population) do
+	for k,v in pairs(population) do
 		v.Score = scoreArray[k]
 	end
 end

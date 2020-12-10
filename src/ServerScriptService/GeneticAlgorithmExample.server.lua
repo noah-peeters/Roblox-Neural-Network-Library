@@ -151,30 +151,29 @@ local geneticSetting = {
 	
 	MutateBestNetwork = true;
 	PercentageOfCrossedToMutate = 0.6;
-	--NumberOfNodesToMutate = 3;
-	--ParameterMutateRange = 3;
+	NumberOfNodesToMutate = 3;
+	ParameterMutateRange = 3;
 }
 
 local feedForwardSettings = {
 	HiddenActivationName = "ReLU";
 	OutputActivationName = "Tanh";
 	Bias = 0;
-    LearningRate = 0.5;
+    LearningRate = 0.1;
     RandomizeWeights = true;
 }
 
 -- Create a new network with 5 inputs, 2 layers with 4 nodes each and 1 output "steerDirection"
 local tempNet = FeedforwardNetwork.new({"front", "frontLeft", "frontRight", "left", "right"}, 2, 4, {"steerDirection"}, feedForwardSettings)
 --local tempNet = FeedforwardNetwork.newFromSave(game.ServerStorage.NetworkSave.Value)
-local populationSize = 15
 
+local populationSize = 10
 local geneticAlgo = ParamEvo.new(tempNet, populationSize, geneticSetting)		-- Create ParamEvo with the tempNet template, population size and settings
 
 local scoreTable = {}
 local generations = 50	-- Number of generations to train network with
-local firstRun = true
 for _ = 0, generations do
-	for index = 1, populationSize+1 do
+	for index = 1, populationSize do
 		spawn(function()
 			local startTime = os.clock()
 			local clone = game:GetService("ServerStorage").Car:Clone()
@@ -202,13 +201,10 @@ for _ = 0, generations do
 			while bool do
 				local distances = getRayDistances(clone)		-- Get Distances of rays
 				local output
-				if firstRun then
-					output = tempNet(distances)				-- Get output of NN with input distances
-				else
-					local population = geneticAlgo:GetPopulation()
-					local net = population[1].Network
-					output = net(distances)				-- Get output of NN with input distances
-				end
+				--if firstRun then
+				local population = geneticAlgo:GetPopulation()
+				local net = population[1].Network
+				output = net(distances)				-- Get output of NN with input distances
 
 				-- Set steering direction to direction of NN
 				clone.RemoteControl.SteerFloat = output.steerDirection
@@ -224,7 +220,7 @@ for _ = 0, generations do
 			end
 			
 			score += (os.clock() - startTime)/2		-- Increment score based on time alive (longer is better)
-			print("Exit score: "..math.floor(score*100)/100)
+			--print("Exit score: "..math.floor(score*100)/100)
 
 			clone:Destroy()
 			scoreTable[index] = score
@@ -234,15 +230,12 @@ for _ = 0, generations do
 	-- Wait until generation finished
 	repeat
 		wait(1)
+		print("scoretable: "..#scoreTable)
 	until #scoreTable >= populationSize
 	
 	geneticAlgo:ProcessGeneration(scoreTable)
 	scoreTable = {}
-	firstRun = false
 end
-
--- Run the algorithm x generations
---geneticAlgo:ProcessGenerationsInBatch(15, 1, 1)
 
 local save = geneticAlgo:GetBestNetwork():Save()
 game.ServerStorage.NetworkSave.Value = save
