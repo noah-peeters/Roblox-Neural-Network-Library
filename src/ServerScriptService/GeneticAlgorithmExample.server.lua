@@ -139,7 +139,7 @@ local geneticSetting = {
 	-- The function that runs when a generation is complete. It is given the genetic algorithm as input.
 	PostFunction = function(geneticAlgo)
 		local info = geneticAlgo:GetInfo()
-		print("Generation "..info.Generation..", Best Score: "..info.BestScore)
+		print("Generation " .. info.Generation .. ", Best Score: " .. info.BestScore)
 	end;
 
 	HigherScoreBetter = true;
@@ -147,38 +147,48 @@ local geneticSetting = {
 	PercentageToKill = 0.4;
 	PercentageOfKilledToRandomlySpare = 0.1;
 	PercentageOfBestParentToCrossover = 0.8;
-	PercentageToMutate = 0.7;
+	PercentageToMutate = 0.8;
 	
 	MutateBestNetwork = true;
 	PercentageOfCrossedToMutate = 0.6;
-	NumberOfNodesToMutate = 3;
-	ParameterMutateRange = 3;
+	--NumberOfNodesToMutate = 3;
+	--ParameterMutateRange = 3;
 }
 
 local feedForwardSettings = {
 	HiddenActivationName = "ReLU";
 	OutputActivationName = "Tanh";
-	Bias = 0;
-    LearningRate = 0.1;
-    RandomizeWeights = true;
+	--Bias = 0;
+    --LearningRate = 0.1;
+    --RandomizeWeights = true;
 }
 
 -- Create a new network with 5 inputs, 2 layers with 4 nodes each and 1 output "steerDirection"
 local tempNet = FeedforwardNetwork.new({"front", "frontLeft", "frontRight", "left", "right"}, 2, 4, {"steerDirection"}, feedForwardSettings)
 --local tempNet = FeedforwardNetwork.newFromSave(game.ServerStorage.NetworkSave.Value)
 
-local populationSize = 10
+local populationSize = 20
 local geneticAlgo = ParamEvo.new(tempNet, populationSize, geneticSetting)		-- Create ParamEvo with the tempNet template, population size and settings
 
+local function roundDecimals(num, places)
+    places = math.pow(10, places or 0)
+    num = num * places
+    if num >= 0 then 
+        num = math.floor(num + 0.5) 
+    else 
+        num = math.ceil(num - 0.5) 
+    end
+    return num / places
+end
+
 local scoreTable = {}
-local generations = 50	-- Number of generations to train network with
-for _ = 0, generations do
+local generations = 30	-- Number of generations to train network with
+for _ = 1, generations do
 	for index = 1, populationSize do
-		spawn(function()
+		local newThread = coroutine.create(function()
 			local startTime = os.clock()
 			local clone = game:GetService("ServerStorage").Car:Clone()
 			clone.RemoteControl.MaxSpeed = 200
-
 			-- Parent to workspace and then setup Scripts of car
 			clone.Parent = workspace
 
@@ -192,19 +202,20 @@ for _ = 0, generations do
 							bool = false
 						elseif hit.Parent == workspace.Checkpoints and not checkpointsHit[tonumber(hit.Name)] then	-- Give extra points when car reaches checkpoint
 							local numHit = tonumber(hit.Name)
-							score += (numHit * 2)
-							checkpointsHit[numHit] = hit
+							if numHit and typeof(numHit) == "number" then
+								score += (numHit * 2)
+								checkpointsHit[numHit] = hit
+							end
 						end
 					end)
 				end
 			end
+
+			-- Setup Algorithm
+			local net = geneticAlgo:GetPopulation()[index].Network
 			while bool do
-				local distances = getRayDistances(clone)		-- Get Distances of rays
-				local output
-				--if firstRun then
-				local population = geneticAlgo:GetPopulation()
-				local net = population[1].Network
-				output = net(distances)				-- Get output of NN with input distances
+				local distances = getRayDistances(clone)				-- Get Distances of rays
+				local output = net(distances)	-- Get output of NN with input distances
 
 				-- Set steering direction to direction of NN
 				clone.RemoteControl.SteerFloat = output.steerDirection
@@ -218,23 +229,25 @@ for _ = 0, generations do
 				end
 				wait()
 			end
-			
-			score += (os.clock() - startTime)/2		-- Increment score based on time alive (longer is better)
-			--print("Exit score: "..math.floor(score*100)/100)
-
 			clone:Destroy()
-			scoreTable[index] = score
+			
+			score = score + (os.clock() - startTime)/2		-- Increment score based on time alive (longer is better)
+
+			--print("Exit score: " .. score)
+			scoreTable[index] = roundDecimals(score, 2)
 		end)
-		wait(1)
+		coroutine.resume(newThread)
+		wait(0.5)
 	end
 	-- Wait until generation finished
-	repeat
+	while #scoreTable < populationSize do
 		wait(1)
-		print("scoretable: "..#scoreTable)
-	until #scoreTable >= populationSize
+	end
+	print(scoreTable)
 	
 	geneticAlgo:ProcessGeneration(scoreTable)
 	scoreTable = {}
+	print(scoreTable)
 end
 
 local save = geneticAlgo:GetBestNetwork():Save()
